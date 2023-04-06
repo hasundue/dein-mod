@@ -74,9 +74,7 @@ function! dein#mod#add(repo, options = {}) abort
       let hook_string .= line . "\n"
     endfor
   endif
-
-  echomsg printf('[dein-mod] Added %s: options = %s', plugin.name, options)
-
+  " echomsg printf('[dein-mod] Added %s: options = %s', plugin.name, options)
   call dein#add(a:repo, options)
 endfunction
 
