@@ -1,6 +1,22 @@
 " A directory where hook files are stored
 let g:dein#mod#hook_dir = get(g:, 'dein#mod#hook_dir', '')
 
+" A regexp for the beginning of a comment
+let g:dein#mod#hook_comment_regexp = get(g:, 'dein#mod#hook_type_regexp',
+  \ '^\("\|--\)')
+
+" A regexp for a hook type
+let g:dein#mod#hook_type_regexp = get(g:, 'dein#mod#hook_type_regexp',
+  \ '\(hook_\w\+\|lua_\w\+\|ftplugin\[".\+"\]\)')
+
+" A regexp for the start of a block
+let g:dein#mod#hook_start_regexp = get(g:, 'dein#mod#hook_start_regexp',
+  \ g:dein#mod#hook_comment_regexp . '\s\+\zs' . g:dein#mod#hook_type_regexp . '\ze\s\+{')
+
+" A regexp for the end of a block
+let g:dein#mod#hook_end_regexp = get(g:, 'dein#mod#hook_end_regexp',
+  \ g:dein#mod#hook_comment_regexp . '\s\+}')
+
 "
 " A function to add plugins with hooks
 "
@@ -14,60 +30,52 @@ function! dein#mod#add(repo, options = {}) abort
   endif
 
   let plugin = dein#parse#_dict(dein#parse#_init(a:repo, a:options))
-
   let options = a:options
+  let options.ftplugin = {}
 
   let plugin_name = fnamemodify(plugin.name, ':r')
   let filename = fnamemodify(g:dein#mod#hook_dir . '/' . plugin_name, ':p')
 
-  let vim_path = filename . '.vim'
-  let lua_path = filename . '.lua'
+  let filepath = ''
 
-  let vim_exists = filereadable(vim_path)
-  let lua_exists = filereadable(lua_path)
+  if filereadable(filename . '.vim')
+    let filepath = filename . '.vim'
+  endif
 
-  let filepath = vim_exists ? vim_path : (lua_exists ? lua_path : '')
+  if filereadable(filename . '.lua')
+    let filepath = filename . '.lua'
+  endif
 
   if filepath !=# ''
-    let commenter = vim_exists ? '^"' : '^--'
-    let regexp_start = commenter . ' \zs\(hook_\|lua_\|ftplugin: \)\S\+\ze {'
-    let regexp_end = commenter . ' }'
-
     let hook_type = ''
     let hook_string = ''
 
     let lines = readfile(filepath)
 
     for line in lines
-      if line ==# '' || line =~# commenter . '\s*$'
-        continue
-      endif
-
       if hook_type ==# ''
-        let hook_type = matchstr(line, regexp_start)
+        let hook_type = matchstr(line, g:dein#mod#hook_type_regexp)
         continue
       endif
 
-      let str_end = matchstr(line, regexp_end)
+      if line ==# '' || line =~# g:dein#mod#hook_comment_regexp . '\s\*$'
+        continue
+      endif
 
-      if str_end !=# ''
-        let filetype = matchstr(hook_type, 'ftplugin: \zs\S\+')
-
-        if filetype !=# ''
-          let options.ftplugin = get(options, 'ftplugin', {})
-          execute printf('let options.ftplugin["%s"] = hook_string', filetype)
-        else
-          execute printf('let options["%s"] = hook_string', hook_type)
-        endif
+      if matchstr(line, g:dein#mod#hook_end_regexp) !=# ''
+        execute printf('let options.%s = hook_string', hook_type)
 
         let hook_type = ''
         let hook_string = ''
+
         continue
       endif
 
       let hook_string .= line . "\n"
     endfor
   endif
+
+  echomsg printf('[dein-mod] Added %s: options = %s', plugin.name, options)
 
   call dein#add(a:repo, options)
 endfunction
